@@ -1,0 +1,64 @@
+trigger:
+  branches:
+    include:
+      - master  # Trigger deployment when changes are pushed to 'main'
+
+pool:
+  vmImage: 'ubuntu-latest'  # Use Ubuntu image for the build agent
+
+variables:
+  azureSubscription: 'Pay-As-You-Go'  # Replace with your Azure DevOps service connection name
+  appName: 'originxlabsangularui'  # Azure Web App Name
+  resourceGroup: 'originx-angular-RG'  # Resource Group Name in Azure
+  angularAppName: 'originXLabsUI'  # Angular project name defined in angular.json
+  buildConfiguration: 'production'  # Set default build environment (production, stage, qa)
+  buildDirectory: 'dist/origin-xlabs-ui'  # Build output directory (as defined in angular.json)
+  
+stages:
+- stage: Build
+  displayName: 'Build Angular Application'
+  jobs:
+    - job: BuildJob
+      displayName: 'Build Angular Application'
+      steps:
+        - task: NodeTool@0
+          inputs:
+            versionSpec: '18.x'  # Install Node.js version 18.x
+          displayName: 'Install Node.js'
+
+        - checkout: self  # Checkout code from repository
+
+        - task: Npm@1
+          inputs:
+            command: 'install'  # Install npm packages
+          displayName: 'Install npm packages'
+
+        - task: Npm@1
+          inputs:
+            command: 'run'
+            arguments: 'build --configuration=$(buildConfiguration) --output-hashing=all'  # Run Angular build with prod, stage, or qa config
+          displayName: 'Build Angular App'
+
+        - task: PublishBuildArtifacts@1
+          inputs:
+            artifactName: 'drop'
+            targetPath: '$(Build.ArtifactStagingDirectory)'
+            publishLocation: 'Container'  # Publish build artifacts (output of build)
+          displayName: 'Publish Artifacts'
+
+- stage: Deploy
+  displayName: 'Deploy to Azure Web App'
+  dependsOn: Build
+  jobs:
+    - job: DeployJob
+      displayName: 'Deploy Angular App to Azure Web App'
+      steps:
+        - task: AzureWebApp@1
+          inputs:
+            azureSubscription: $(azureSubscription)  # Azure service connection name
+            appName: $(appName)  # Azure Web App name (originxlabsangularui)
+            package: '$(Build.ArtifactStagingDirectory)/drop/$(buildDirectory)/*.zip'  # Path to build artifact (ZIP file of the build output)
+            resourceGroupName: $(resourceGroup)  # Azure Resource Group name
+            deploymentMethod: 'auto'  # Use the auto deployment method (Kudu or Zip)
+          displayName: 'Deploy to Azure Web App'
+
