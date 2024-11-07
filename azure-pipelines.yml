@@ -1,7 +1,7 @@
 trigger:
   branches:
     include:
-      - master  # Trigger deployment when changes are pushed to 'main'
+      - master  # Trigger deployment when changes are pushed to 'master'
 
 pool:
   vmImage: 'ubuntu-latest'  # Use Ubuntu image for the build agent
@@ -12,14 +12,16 @@ variables:
   resourceGroup: 'originx-angular-RG'  # Resource Group Name in Azure
   angularAppName: 'originXLabsUI'  # Angular project name defined in angular.json
   buildConfiguration: 'production'  # Set default build environment (production, stage, qa)
-  buildDirectory: 'dist/origin-xlabs-ui'  # Build output directory (as defined in angular.json)
-  
+  buildDirectory: 'dist/originxlabsangularui'  # Corrected Build output directory
+
 stages:
 - stage: Build
   displayName: 'Build Angular Application'
   jobs:
     - job: BuildJob
       displayName: 'Build Angular Application'
+      pool:
+        vmImage: 'ubuntu-latest'
       steps:
         - task: NodeTool@0
           inputs:
@@ -42,8 +44,8 @@ stages:
         - task: PublishBuildArtifacts@1
           inputs:
             artifactName: 'drop'
-            targetPath: '$(Build.ArtifactStagingDirectory)'
-            publishLocation: 'Container'  # Publish build artifacts (output of build)
+            pathToPublish: '$(System.DefaultWorkingDirectory)/$(buildDirectory)'
+            publishLocation: 'Container'  # Publish build artifacts
           displayName: 'Publish Artifacts'
 
 - stage: Deploy
@@ -52,13 +54,14 @@ stages:
   jobs:
     - job: DeployJob
       displayName: 'Deploy Angular App to Azure Web App'
+      pool:
+        vmImage: 'ubuntu-latest'
       steps:
         - task: AzureWebApp@1
           inputs:
             azureSubscription: $(azureSubscription)  # Azure service connection name
             appName: $(appName)  # Azure Web App name (originxlabsangularui)
-            package: '$(Build.ArtifactStagingDirectory)/drop/$(buildDirectory)/*.zip'  # Path to build artifact (ZIP file of the build output)
+            package: '$(System.DefaultWorkingDirectory)/drop/*.zip'  # Path to build artifact ZIP file
             resourceGroupName: $(resourceGroup)  # Azure Resource Group name
             deploymentMethod: 'auto'  # Use the auto deployment method (Kudu or Zip)
           displayName: 'Deploy to Azure Web App'
-
